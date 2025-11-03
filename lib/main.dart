@@ -3,9 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:app_uts/home_page.dart';
 import 'package:app_uts/form_page.dart';
 import 'package:app_uts/transaksi_model.dart';
-import 'package:google_fonts/google_fonts.dart'; // Impor Font
+import 'package:google_fonts/google_fonts.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+
+  Hive.registerAdapter(TransaksiAdapter());
+  Hive.registerAdapter(TipeTransaksiAdapter());
+
+  await Hive.openBox<Transaksi>('transaksiBox');
+
+  // --- PERUBAHAN 1: Buka Box untuk Pengaturan ---
+  await Hive.openBox('settingsBox');
+
   runApp(const MyApp());
 }
 
@@ -17,36 +29,35 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  ThemeMode _themeMode = ThemeMode.light;
-  final List<Transaksi> _dataList = [];
+  // --- PERUBAHAN 2: Baca nilai tema dari Hive ---
+  // Kita beri nilai default 'false' (light mode) jika belum ada
+  ThemeMode _themeMode = Hive.box('settingsBox').get('isDark', defaultValue: false)
+      ? ThemeMode.dark
+      : ThemeMode.light;
 
   void _handleThemeChanged(ThemeMode mode) {
+    // --- PERUBAHAN 3: Simpan pilihan tema ke Hive ---
+    bool isDark = mode == ThemeMode.dark;
+    Hive.box('settingsBox').put('isDark', isDark);
+
     setState(() {
       _themeMode = mode;
     });
   }
 
-  // --- LOGIKA INTI APLIKASI ---
+  // --- (Semua fungsi CRUD: _add, _edit, _delete, _navigateToForm
+  //       TIDAK BERUBAH SAMA SEKALI) ---
 
   void _addTransaksi(Transaksi transaksi) {
-    setState(() {
-      _dataList.add(transaksi);
-    });
+    Hive.box<Transaksi>('transaksiBox').put(transaksi.id, transaksi);
   }
 
   void _editTransaksi(Transaksi transaksi) {
-    setState(() {
-      final index = _dataList.indexWhere((item) => item.id == transaksi.id);
-      if (index != -1) {
-        _dataList[index] = transaksi;
-      }
-    });
+    Hive.box<Transaksi>('transaksiBox').put(transaksi.id, transaksi);
   }
 
   void _deleteTransaksi(String id) {
-    setState(() {
-      _dataList.removeWhere((item) => item.id == id);
-    });
+    Hive.box<Transaksi>('transaksiBox').delete(id);
   }
 
   void _navigateToForm(BuildContext context, {Transaksi? transaksiToEdit}) async {
@@ -72,8 +83,6 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Aplikasi Keuangan',
-
-      // Terapkan font Poppins ke seluruh tema
       theme: ThemeData(
         brightness: Brightness.light,
         primarySwatch: Colors.indigo,
@@ -91,14 +100,23 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
 
+      // Gunakan _themeMode yang sudah di-load dari Hive
       themeMode: _themeMode,
 
-      home: HomePage(
-        currentThemeMode: _themeMode,
-        onThemeChanged: _handleThemeChanged,
-        dataList: _dataList,
-        navigateToForm: _navigateToForm,
-        deleteTransaksi: _deleteTransaksi,
+      home: ValueListenableBuilder(
+        valueListenable: Hive.box<Transaksi>('transaksiBox').listenable(),
+        builder: (context, Box<Transaksi> box, _) {
+          final dataList = box.values.toList();
+
+          return HomePage(
+            // Pastikan _themeMode yang terbaru (dari state) dikirim ke HomePage
+            currentThemeMode: _themeMode,
+            onThemeChanged: _handleThemeChanged,
+            dataList: dataList,
+            navigateToForm: _navigateToForm,
+            deleteTransaksi: _deleteTransaksi,
+          );
+        },
       ),
       debugShowCheckedModeBanner: false,
     );

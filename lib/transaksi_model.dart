@@ -1,12 +1,32 @@
 // transaksi_model.dart
+import 'package:hive/hive.dart';
 
-enum TipeTransaksi { pemasukan, pengeluaran }
+part 'transaksi_model.g.dart'; // Ini akan dibuat otomatis
 
-class Transaksi {
+@HiveType(typeId: 1) // Beri ID unik untuk enum
+enum TipeTransaksi {
+  @HiveField(0)
+  pemasukan,
+
+  @HiveField(1)
+  pengeluaran
+}
+
+@HiveType(typeId: 0) // Beri ID unik untuk class
+class Transaksi extends HiveObject {
+  @HiveField(0)
   final String id;
+
+  @HiveField(1)
   final String keterangan;
+
+  @HiveField(2)
   final int jumlah;
+
+  @HiveField(3)
   final TipeTransaksi tipe;
+
+  @HiveField(4)
   final DateTime tanggal;
 
   Transaksi({
